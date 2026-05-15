@@ -1,24 +1,13 @@
-import { useState, useMemo } from 'react';
-import { AGENTS, INITIAL_TICKETS } from '../../data/tickets';
+import { useState, useEffect, useMemo } from 'react';
+import { tickets as ticketsApi, users as usersApi, comments as commentsApi } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
 import '../../styles/admin.css';
 
-// ── helpers ────────────────────────────────────────────────────────
 const STATUS_LABELS = { open: 'Open', 'in-progress': 'In Progress', closed: 'Closed' };
-const CATEGORIES    = ['WiFi', 'Hardware', 'Software', 'Account', 'Printer', 'Other'];
-const PRIORITIES    = ['high', 'med', 'low'];
 
-function agent(id) { return AGENTS.find(a => a.id === id) || null; }
-
-// ── Sidebar ────────────────────────────────────────────────────────
-function Sidebar({ tickets, activeNav, onNav }) {
-  const open   = tickets.filter(t => t.status === 'open').length;
-  const inProg = tickets.filter(t => t.status === 'in-progress').length;
-
-  const agentLoads = AGENTS.map(a => ({
-    ...a,
-    count: tickets.filter(t => t.assignee === a.id && t.status !== 'closed').length,
-  }));
-
+// ── Sidebar ───────────────────────────────────────────────────────
+function Sidebar({ stats, activeNav, onNav, agents }) {
+  const { user, logout } = useAuth();
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
@@ -34,104 +23,81 @@ function Sidebar({ tickets, activeNav, onNav }) {
       <div className="sidebar-section">
         <div className="sidebar-section-label">Main</div>
         {[
-          { id: 'all',      icon: '🎫', label: 'All Tickets', badge: tickets.length },
-          { id: 'open',     icon: '📬', label: 'Open',        badge: open,   badgeClass: open   > 0 ? 'red' : '' },
-          { id: 'progress', icon: '⚡', label: 'In Progress', badge: inProg, badgeClass: '' },
-          { id: 'closed',   icon: '✅', label: 'Closed',      badge: null },
+          { id: 'all',        icon: '🎫', label: 'All Tickets',   badge: stats?.total },
+          { id: 'open',       icon: '📬', label: 'Open',          badge: stats?.open,        badgeClass: stats?.open > 0 ? 'red' : '' },
+          { id: 'progress',   icon: '⚡', label: 'In Progress',   badge: stats?.progress },
+          { id: 'closed',     icon: '✅', label: 'Closed',        badge: null },
+          { id: 'unassigned', icon: '👤', label: 'Unassigned',    badge: stats?.unassigned },
+          { id: 'high',       icon: '🔴', label: 'High Priority', badge: stats?.highPriority },
         ].map(item => (
-          <button
-            key={item.id}
-            className={`sidebar-link${activeNav === item.id ? ' active' : ''}`}
-            onClick={() => onNav(item.id)}
-          >
+          <button key={item.id} className={`sidebar-link${activeNav === item.id ? ' active' : ''}`} onClick={() => onNav(item.id)}>
             <span className="sidebar-link-icon">{item.icon}</span>
             {item.label}
-            {item.badge != null && (
-              <span className={`sidebar-badge${item.badgeClass ? ' ' + item.badgeClass : ''}`}>
-                {item.badge}
-              </span>
+            {item.badge != null && item.badge > 0 && (
+              <span className={`sidebar-badge${item.badgeClass ? ' ' + item.badgeClass : ''}`}>{item.badge}</span>
             )}
-          </button>
-        ))}
-      </div>
-
-      <div className="sidebar-section">
-        <div className="sidebar-section-label">Views</div>
-        {[
-          { id: 'unassigned', icon: '👤', label: 'Unassigned' },
-          { id: 'high',       icon: '🔴', label: 'High Priority' },
-        ].map(item => (
-          <button
-            key={item.id}
-            className={`sidebar-link${activeNav === item.id ? ' active' : ''}`}
-            onClick={() => onNav(item.id)}
-          >
-            <span className="sidebar-link-icon">{item.icon}</span>
-            {item.label}
           </button>
         ))}
       </div>
 
       <div className="sidebar-agents">
         <div className="sidebar-agents-label">Team</div>
-        {agentLoads.map(a => (
+        {agents.map(a => (
           <div key={a.id} className="agent-row">
-            <div className="agent-avatar" style={{ background: a.color }}>{a.avatar}</div>
+            <div className="agent-avatar" style={{ background: '#185FA5' }}>{a.avatar || a.name.slice(0,2).toUpperCase()}</div>
             <span className="agent-name">{a.name}</span>
-            {a.count > 0 && <span className="agent-count">{a.count}</span>}
           </div>
         ))}
+        <button className="sidebar-link" style={{ marginTop: 8, color: 'var(--red-600)' }} onClick={logout}>
+          <span className="sidebar-link-icon">🚪</span> გასვლა
+        </button>
       </div>
     </aside>
   );
 }
 
-// ── Status badge ───────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const cls = status === 'in-progress' ? 'progress' : status;
-  return (
-    <span className={`badge ${cls}`}>
-      <span className="badge-dot" />
-      {STATUS_LABELS[status]}
-    </span>
-  );
+  return <span className={`badge ${cls}`}><span className="badge-dot" />{STATUS_LABELS[status]}</span>;
 }
 
-// ── Priority badge ─────────────────────────────────────────────────
 function PriorityBadge({ priority }) {
   const labels = { high: 'High', med: 'Medium', low: 'Low' };
   return <span className={`priority-badge ${priority}`}>{labels[priority]}</span>;
 }
 
-// ── Ticket detail panel ────────────────────────────────────────────
-const DEMO_COMMENTS = {
-  '#TK-0046': [
-    { author: 'Giorgi M.', time: '10:05', text: 'Checked the printer — paper jam cleared. Waiting for user to confirm print works.' },
-    { author: 'System',    time: '10:30', text: 'Status updated to In Progress.' },
-  ],
-  '#TK-0045': [
-    { author: 'Ana K.',    time: '10:55', text: 'Confirmed Outlook issue. Running Exchange sync repair. Will update shortly.' },
-  ],
-};
-
+// ── Detail panel ──────────────────────────────────────────────────
 function DetailPanel({ ticket, onClose, onUpdate, agents }) {
   const [localStatus,   setLocalStatus]   = useState(ticket.status);
-  const [localAssignee, setLocalAssignee] = useState(ticket.assignee || '');
-  const [comment, setComment] = useState('');
-  const [comments, setComments] = useState(DEMO_COMMENTS[ticket.id] || []);
+  const [localAssignee, setLocalAssignee] = useState(ticket.assignee?.id || '');
+  const [commentList,   setCommentList]   = useState(ticket.comments || []);
+  const [newComment,    setNewComment]    = useState('');
+  const [saving,        setSaving]        = useState(false);
 
-  function save(field, val) {
-    if (field === 'status')   { setLocalStatus(val);   onUpdate(ticket.id, { status:   val }); }
-    if (field === 'assignee') { setLocalAssignee(val); onUpdate(ticket.id, { assignee: val || null }); }
+  async function changeStatus(s) {
+    setLocalStatus(s);
+    await ticketsApi.update(ticket.id, { status: s });
+    onUpdate(ticket.id, { status: s });
   }
 
-  function addComment() {
-    if (!comment.trim()) return;
-    setComments(c => [...c, { author: 'You (Admin)', time: 'Just now', text: comment.trim() }]);
-    setComment('');
+  async function changeAssignee(val) {
+    setLocalAssignee(val);
+    await ticketsApi.update(ticket.id, { assignee_id: val ? Number(val) : null });
+    const ag = agents.find(a => String(a.id) === String(val));
+    onUpdate(ticket.id, { assignee: ag || null });
   }
 
-  const ag = agent(localAssignee);
+  async function addComment() {
+    if (!newComment.trim()) return;
+    setSaving(true);
+    try {
+      const data = await commentsApi.add(ticket.id, newComment.trim());
+      setCommentList(c => [...c, data.comment]);
+      setNewComment('');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="detail-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -140,7 +106,7 @@ function DetailPanel({ ticket, onClose, onUpdate, agents }) {
           <div style={{ flex: 1 }}>
             <p className="detail-title">{ticket.title}</p>
             <div className="detail-meta-row">
-              <span className="ticket-id-cell">{ticket.id}</span>
+              <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#888780' }}>{ticket.ref}</span>
               <StatusBadge status={localStatus} />
               <PriorityBadge priority={ticket.priority} />
               <span className={`via-badge ${ticket.via}`}>{ticket.via === 'wizard' ? '🔧 wizard' : '✍️ direct'}</span>
@@ -150,14 +116,20 @@ function DetailPanel({ ticket, onClose, onUpdate, agents }) {
         </div>
 
         <div className="detail-body">
-          {/* Details */}
+          {ticket.description && (
+            <div className="detail-section">
+              <div className="detail-section-label">Description</div>
+              <p style={{ fontSize: 13, color: 'var(--gray-700)', lineHeight: 1.6 }}>{ticket.description}</p>
+            </div>
+          )}
+
           <div className="detail-section">
             <div className="detail-section-label">Details</div>
             {[
               ['Category', ticket.category],
-              ['Created',  ticket.created],
-              ['Updated',  ticket.updated],
-              ['Source',   ticket.via === 'wizard' ? 'Troubleshooting wizard' : 'Direct submission'],
+              ['Submitted by', ticket.user?.name || '—'],
+              ['Created', ticket.createdAt?.slice(0, 16).replace('T', ' ')],
+              ['Updated', ticket.updatedAt?.slice(0, 16).replace('T', ' ')],
             ].map(([l, v]) => (
               <div className="detail-field" key={l}>
                 <span className="detail-field-label">{l}</span>
@@ -166,14 +138,13 @@ function DetailPanel({ ticket, onClose, onUpdate, agents }) {
             ))}
           </div>
 
-          {/* Status */}
           <div className="detail-section">
             <div className="detail-section-label">Status</div>
             <div className="detail-status-btns">
               {['open', 'in-progress', 'closed'].map(s => {
                 const activeClass = localStatus === s ? `active-${s === 'in-progress' ? 'progress' : s}` : '';
                 return (
-                  <button key={s} className={`status-btn ${activeClass}`} onClick={() => save('status', s)}>
+                  <button key={s} className={`status-btn ${activeClass}`} onClick={() => changeStatus(s)}>
                     {STATUS_LABELS[s]}
                   </button>
                 );
@@ -181,44 +152,33 @@ function DetailPanel({ ticket, onClose, onUpdate, agents }) {
             </div>
           </div>
 
-          {/* Assign */}
           <div className="detail-section">
             <div className="detail-section-label">Assigned to</div>
-            <select
-              className="detail-assign-select"
-              value={localAssignee}
-              onChange={e => save('assignee', e.target.value)}
-            >
+            <select className="detail-assign-select" value={localAssignee} onChange={e => changeAssignee(e.target.value)}>
               <option value="">— Unassigned</option>
-              {agents.map(a => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
+              {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </div>
 
-          {/* Comments */}
           <div className="detail-section">
-            <div className="detail-section-label">Comments ({comments.length})</div>
-            {comments.length > 0 && (
+            <div className="detail-section-label">Comments ({commentList.length})</div>
+            {commentList.length > 0 && (
               <div className="comment-list">
-                {comments.map((c, i) => (
-                  <div key={i} className="comment-item">
+                {commentList.map(c => (
+                  <div key={c.id} className="comment-item">
                     <div className="comment-meta">
-                      <span className="comment-author">{c.author}</span>
-                      <span className="comment-time">{c.time}</span>
+                      <span className="comment-author">{c.user?.name}</span>
+                      <span className="comment-time">{c.createdAt?.slice(11, 16)}</span>
                     </div>
-                    <p className="comment-text">{c.text}</p>
+                    <p className="comment-text">{c.body}</p>
                   </div>
                 ))}
               </div>
             )}
-            <textarea
-              className="comment-input"
-              placeholder="Add a note or update…"
-              value={comment}
-              onChange={e => setComment(e.target.value)}
-            />
-            <button className="btn-sm btn-sm-primary" onClick={addComment}>Add comment</button>
+            <textarea className="comment-input" placeholder="Add a note…" value={newComment} onChange={e => setNewComment(e.target.value)} />
+            <button className="btn-sm btn-sm-primary" onClick={addComment} disabled={saving}>
+              {saving ? '...' : 'Add comment'}
+            </button>
           </div>
         </div>
       </div>
@@ -226,145 +186,110 @@ function DetailPanel({ ticket, onClose, onUpdate, agents }) {
   );
 }
 
-// ── Main table row ─────────────────────────────────────────────────
-function TicketRow({ ticket, onSelect, onAssign, agents }) {
-  const ag = agent(ticket.assignee);
-  return (
-    <tr onClick={() => onSelect(ticket)}>
-      <td className="ticket-id-cell">{ticket.id}</td>
-      <td className="ticket-title-cell">
-        <div className="ticket-title">{ticket.title}</div>
-        <div className="ticket-meta">{ticket.category} · {ticket.created}</div>
-      </td>
-      <td><StatusBadge status={ticket.status} /></td>
-      <td><PriorityBadge priority={ticket.priority} /></td>
-      <td onClick={e => e.stopPropagation()}>
-        <div className="assignee-cell">
-          {ag && (
-            <div className="agent-avatar" style={{ width: 22, height: 22, fontSize: 9, background: ag.color }}>
-              {ag.avatar}
-            </div>
-          )}
-          <select
-            className="assign-select"
-            value={ticket.assignee || ''}
-            onChange={e => onAssign(ticket.id, e.target.value || null)}
-          >
-            <option value="">Unassigned</option>
-            {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-        </div>
-      </td>
-      <td>
-        <span className={`via-badge ${ticket.via}`}>
-          {ticket.via === 'wizard' ? '🔧 wizard' : '✍️ direct'}
-        </span>
-      </td>
-    </tr>
-  );
-}
-
-// ── Root AdminDashboard ────────────────────────────────────────────
+// ── Main Dashboard ────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const [tickets, setTickets] = useState(INITIAL_TICKETS);
-  const [activeNav, setActiveNav]       = useState('all');
-  const [search, setSearch]             = useState('');
+  const [tickets,      setTickets]      = useState([]);
+  const [stats,        setStats]        = useState(null);
+  const [agents,       setAgents]       = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [selected,     setSelected]     = useState(null);
+  const [activeNav,    setActiveNav]    = useState('all');
+  const [search,       setSearch]       = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [catFilter, setCatFilter]       = useState('');
-  const [prioFilter, setPrioFilter]     = useState('');
-  const [selected, setSelected]         = useState(null);
+  const [catFilter,    setCatFilter]    = useState('');
+  const [prioFilter,   setPrioFilter]   = useState('');
 
-  // stats
-  const stats = useMemo(() => ({
-    total:    tickets.length,
-    open:     tickets.filter(t => t.status === 'open').length,
-    progress: tickets.filter(t => t.status === 'in-progress').length,
-    closed:   tickets.filter(t => t.status === 'closed').length,
-  }), [tickets]);
+  async function loadData() {
+    try {
+      const [ticketData, statsData, agentData] = await Promise.all([
+        ticketsApi.list(),
+        ticketsApi.stats(),
+        usersApi.agents(),
+      ]);
+      setTickets(ticketData.tickets || []);
+      setStats(statsData);
+      setAgents(agentData.users || []);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  // nav → filter mapping
-  const navFiltered = useMemo(() => {
-    return tickets.filter(t => {
-      if (activeNav === 'open')       return t.status === 'open';
-      if (activeNav === 'progress')   return t.status === 'in-progress';
-      if (activeNav === 'closed')     return t.status === 'closed';
-      if (activeNav === 'unassigned') return !t.assignee;
-      if (activeNav === 'high')       return t.priority === 'high';
-      return true;
-    });
-  }, [tickets, activeNav]);
-
-  // filters + search
-  const displayed = useMemo(() => {
-    return navFiltered.filter(t => {
-      const q = search.toLowerCase();
-      const matchSearch = !q || t.title.toLowerCase().includes(q) || t.id.includes(q) || t.category.toLowerCase().includes(q);
-      const matchStatus = !statusFilter || t.status === statusFilter;
-      const matchCat    = !catFilter    || t.category === catFilter;
-      const matchPrio   = !prioFilter   || t.priority === prioFilter;
-      return matchSearch && matchStatus && matchCat && matchPrio;
-    });
-  }, [navFiltered, search, statusFilter, catFilter, prioFilter]);
+  useEffect(() => { loadData(); }, []);
 
   function updateTicket(id, patch) {
-    setTickets(ts => ts.map(t => t.id === id ? { ...t, ...patch, updated: 'Just now' } : t));
+    setTickets(ts => ts.map(t => t.id === id ? { ...t, ...patch } : t));
     if (selected?.id === id) setSelected(t => ({ ...t, ...patch }));
   }
 
-  const navTitles = {
-    all: 'All Tickets', open: 'Open Tickets', progress: 'In Progress',
-    closed: 'Closed', unassigned: 'Unassigned', high: 'High Priority',
-  };
+  async function openDetail(ticket) {
+    // load with comments
+    const data = await ticketsApi.get(ticket.id);
+    setSelected(data.ticket);
+  }
+
+  // nav filter
+  const navFiltered = useMemo(() => tickets.filter(t => {
+    if (activeNav === 'open')       return t.status === 'open';
+    if (activeNav === 'progress')   return t.status === 'in-progress';
+    if (activeNav === 'closed')     return t.status === 'closed';
+    if (activeNav === 'unassigned') return !t.assignee;
+    if (activeNav === 'high')       return t.priority === 'high';
+    return true;
+  }), [tickets, activeNav]);
+
+  // search + filters
+  const displayed = useMemo(() => navFiltered.filter(t => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || t.title.toLowerCase().includes(q) || (t.ref||'').toLowerCase().includes(q);
+    const matchStatus = !statusFilter || t.status === statusFilter;
+    const matchCat    = !catFilter    || t.category === catFilter;
+    const matchPrio   = !prioFilter   || t.priority === prioFilter;
+    return matchSearch && matchStatus && matchCat && matchPrio;
+  }), [navFiltered, search, statusFilter, catFilter, prioFilter]);
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F3EE', fontFamily: 'DM Sans, sans-serif', color: '#888780' }}>
+        იტვირთება...
+      </div>
+    );
+  }
 
   return (
     <div className="admin-shell">
-      <Sidebar tickets={tickets} activeNav={activeNav} onNav={setActiveNav} />
+      <Sidebar stats={stats} activeNav={activeNav} onNav={setActiveNav} agents={agents} />
 
       <div className="admin-main">
-        {/* Topbar */}
         <div className="admin-topbar">
-          <span className="admin-topbar-title">{navTitles[activeNav]}</span>
+          <span className="admin-topbar-title">
+            {{ all:'All Tickets', open:'Open', progress:'In Progress', closed:'Closed', unassigned:'Unassigned', high:'High Priority' }[activeNav]}
+          </span>
           <div className="admin-topbar-spacer" />
-          <input
-            className="admin-search"
-            placeholder="Search tickets…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <div className="topbar-avatar">IT</div>
+          <input className="admin-search" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} />
+          <button className="btn-sm btn-sm-primary" onClick={loadData} style={{ marginLeft: 8 }}>↻ Refresh</button>
+          <div className="topbar-avatar" title="Admin">IT</div>
         </div>
 
         <div className="admin-content">
           {/* Stats */}
           <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-card-label">Total tickets</div>
-              <div className="stat-card-val blue">{stats.total}</div>
-              <div className="stat-card-sub">All time</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-label">Open</div>
-              <div className="stat-card-val amber">{stats.open}</div>
-              <div className="stat-card-sub">Awaiting response</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-label">In progress</div>
-              <div className="stat-card-val amber">{stats.progress}</div>
-              <div className="stat-card-sub">Being handled</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-label">Resolved</div>
-              <div className="stat-card-val teal">{stats.closed}</div>
-              <div className="stat-card-sub">Closed tickets</div>
-            </div>
+            {[
+              { label: 'Total tickets',  val: stats?.total    || 0, cls: 'blue'  },
+              { label: 'Open',           val: stats?.open     || 0, cls: 'amber' },
+              { label: 'In progress',    val: stats?.progress || 0, cls: 'amber' },
+              { label: 'Resolved',       val: stats?.closed   || 0, cls: 'teal'  },
+            ].map(s => (
+              <div key={s.label} className="stat-card">
+                <div className="stat-card-label">{s.label}</div>
+                <div className={`stat-card-val ${s.cls}`}>{s.val}</div>
+              </div>
+            ))}
           </div>
 
-          {/* Tickets table */}
+          {/* Table */}
           <div className="section-card">
             <div className="section-header">
-              <span className="section-header-title">
-                {displayed.length} ticket{displayed.length !== 1 ? 's' : ''}
-              </span>
+              <span className="section-header-title">{displayed.length} ticket{displayed.length !== 1 ? 's' : ''}</span>
               <div className="section-header-spacer" />
               <div className="filter-row">
                 <select className="filter-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
@@ -375,16 +300,16 @@ export default function AdminDashboard() {
                 </select>
                 <select className="filter-select" value={catFilter} onChange={e => setCatFilter(e.target.value)}>
                   <option value="">All categories</option>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {['WiFi','Hardware','Software','Account','Printer','Other'].map(c => <option key={c}>{c}</option>)}
                 </select>
                 <select className="filter-select" value={prioFilter} onChange={e => setPrioFilter(e.target.value)}>
                   <option value="">All priorities</option>
-                  {PRIORITIES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+                  <option value="high">High</option>
+                  <option value="med">Medium</option>
+                  <option value="low">Low</option>
                 </select>
                 {(statusFilter || catFilter || prioFilter || search) && (
-                  <button className="filter-btn" onClick={() => { setStatusFilter(''); setCatFilter(''); setPrioFilter(''); setSearch(''); }}>
-                    Clear ✕
-                  </button>
+                  <button className="filter-btn" onClick={() => { setStatusFilter(''); setCatFilter(''); setPrioFilter(''); setSearch(''); }}>Clear ✕</button>
                 )}
               </div>
             </div>
@@ -394,45 +319,55 @@ export default function AdminDashboard() {
                 <tr>
                   <th style={{ width: 80 }}>ID</th>
                   <th>Title</th>
-                  <th style={{ width: 110 }}>Status</th>
+                  <th style={{ width: 120 }}>Status</th>
                   <th style={{ width: 90 }}>Priority</th>
-                  <th style={{ width: 160 }}>Assigned to</th>
+                  <th style={{ width: 150 }}>Assigned to</th>
                   <th style={{ width: 90 }}>Source</th>
                 </tr>
               </thead>
               <tbody>
-                {displayed.length > 0
-                  ? displayed.map(t => (
-                      <TicketRow
-                        key={t.id}
-                        ticket={t}
-                        agents={AGENTS}
-                        onSelect={setSelected}
-                        onAssign={(id, val) => updateTicket(id, { assignee: val })}
-                      />
-                    ))
-                  : (
-                    <tr>
-                      <td colSpan={6}>
-                        <div className="table-empty">No tickets match your filters.</div>
-                      </td>
-                    </tr>
-                  )
-                }
+                {displayed.length > 0 ? displayed.map(t => (
+                  <tr key={t.id} onClick={() => openDetail(t)}>
+                    <td className="ticket-id-cell">{t.ref}</td>
+                    <td className="ticket-title-cell">
+                      <div className="ticket-title">{t.title}</div>
+                      <div className="ticket-meta">{t.category} · {t.createdAt?.slice(0,10)}</div>
+                    </td>
+                    <td><StatusBadge status={t.status} /></td>
+                    <td><PriorityBadge priority={t.priority} /></td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <div className="assignee-cell">
+                        {t.assignee && (
+                          <div className="agent-avatar" style={{ width: 22, height: 22, fontSize: 9, background: '#185FA5' }}>
+                            {t.assignee.avatar || t.assignee.name?.slice(0,2)}
+                          </div>
+                        )}
+                        <select className="assign-select"
+                          value={t.assignee?.id || ''}
+                          onChange={async e => {
+                            const val = e.target.value;
+                            await ticketsApi.update(t.id, { assignee_id: val ? Number(val) : null });
+                            const ag = agents.find(a => String(a.id) === String(val));
+                            updateTicket(t.id, { assignee: ag || null });
+                          }}>
+                          <option value="">Unassigned</option>
+                          {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+                      </div>
+                    </td>
+                    <td><span className={`via-badge ${t.via}`}>{t.via === 'wizard' ? '🔧 wizard' : '✍️ direct'}</span></td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan={6}><div className="table-empty">No tickets found.</div></td></tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      {/* Detail slide-over */}
       {selected && (
-        <DetailPanel
-          ticket={selected}
-          agents={AGENTS}
-          onClose={() => setSelected(null)}
-          onUpdate={updateTicket}
-        />
+        <DetailPanel ticket={selected} agents={agents} onClose={() => setSelected(null)} onUpdate={updateTicket} />
       )}
     </div>
   );
