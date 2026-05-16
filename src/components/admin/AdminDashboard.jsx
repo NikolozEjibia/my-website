@@ -92,7 +92,7 @@ function CreateAgentModal({ onClose, onCreated }) {
 
 // ── Sidebar ───────────────────────────────────────────────────────
 function Sidebar({ stats, activeNav, onNav, agents, onCreateAgent, onBack, onDeleteAgent }) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
