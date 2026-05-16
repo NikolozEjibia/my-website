@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { tickets as ticketsApi, users as usersApi, comments as commentsApi, auth as authApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/admin.css';
+import { useLang } from '../../context/LangContext';
 
 const STATUS_LABELS = { open: 'Open', 'in-progress': 'In Progress', closed: 'Closed' };
 
@@ -410,6 +411,16 @@ export default function AdminDashboard({ onBack }) {
           <input className="admin-search" placeholder="Search tickets or names…" value={search} onChange={e => setSearch(e.target.value)} />
           <button className="btn-sm btn-sm-primary" onClick={loadData} style={{ marginLeft: 8 }}>↻</button>
           <div className="topbar-avatar">IT</div>
+{(() => {
+  const { lang, setLang } = useLang();
+  return (
+    <div className="lang-toggle" style={{ marginLeft: 8 }}>
+      <button className={`lang-btn${lang === 'en' ? ' active' : ''}`} onClick={() => setLang('en')}>EN</button>
+      <span className="lang-sep">|</span>
+      <button className={`lang-btn${lang === 'ka' ? ' active' : ''}`} onClick={() => setLang('ka')}>ქარ</button>
+    </div>
+  );
+})()}
         </div>
 
         <div className="admin-content">
