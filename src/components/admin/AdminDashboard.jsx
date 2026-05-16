@@ -90,7 +90,7 @@ function CreateAgentModal({ onClose, onCreated }) {
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────
-function Sidebar({ stats, activeNav, onNav, agents, onCreateAgent, onBack }) {
+function Sidebar({ stats, activeNav, onNav, agents, onCreateAgent, onBack, onDeleteAgent }) {
   const { logout } = useAuth();
   return (
     <aside className="sidebar">
@@ -126,26 +126,18 @@ function Sidebar({ stats, activeNav, onNav, agents, onCreateAgent, onBack }) {
 
       <div className="sidebar-section">
         <div className="sidebar-section-label">Team</div>
-{agents.map(a => (
-  <div key={a.id} className="agent-row" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-    <div className="agent-avatar" style={{ background: '#185FA5' }}>{a.avatar || a.name.slice(0,2).toUpperCase()}</div>
-    <span className="agent-name" style={{ flex: 1 }}>{a.name}</span>
-    <span style={{ fontSize: 10, color: '#B4B2A9', background: '#F5F3EE', padding: '1px 6px', borderRadius: 4 }}>{a.role}</span>
-    <button
-      onClick={async () => {
-        if (!confirm(`წაშალოთ ${a.name}?`)) return;
-        try {
-          await usersApi.delete(a.id);
-          setAgents(prev => prev.filter(x => x.id !== a.id));
-        } catch (err) {
-          alert('შეცდომა: ' + err.message);
-        }
-      }}
-      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F09595', fontSize: 14, padding: '2px 4px', lineHeight: 1 }}
-      title="წაშლა"
-    >✕</button>
-  </div>
-))}
+        {agents.map(a => (
+          <div key={a.id} className="agent-row" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="agent-avatar" style={{ background: '#185FA5' }}>{a.avatar || a.name.slice(0,2).toUpperCase()}</div>
+            <span className="agent-name" style={{ flex: 1 }}>{a.name}</span>
+            <span style={{ fontSize: 10, color: '#B4B2A9', background: '#F5F3EE', padding: '1px 6px', borderRadius: 4 }}>{a.role}</span>
+            <button
+              onClick={() => onDeleteAgent(a.id, a.name)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F09595', fontSize: 14, padding: '2px 4px', lineHeight: 1 }}
+              title="წაშლა"
+            >✕</button>
+          </div>
+        ))}
         <button className="sidebar-link" style={{ marginTop: 8, color: 'var(--blue-600)' }} onClick={onCreateAgent}>
           <span className="sidebar-link-icon">➕</span> Support-ის დამატება
         </button>
@@ -378,6 +370,15 @@ export default function AdminDashboard({ onBack }) {
         stats={stats} activeNav={activeNav} onNav={setActiveNav}
         agents={agents} onCreateAgent={() => setShowCreate(true)}
         onBack={onBack}
+        onDeleteAgent={async (id, name) => {
+          if (!confirm(`წაშალოთ ${name}?`)) return;
+          try {
+            await usersApi.delete(id);
+            setAgents(prev => prev.filter(x => x.id !== id));
+          } catch (err) {
+            alert('შეცდომა: ' + err.message);
+          }
+        }}
       />
 
       <div className="admin-main">
