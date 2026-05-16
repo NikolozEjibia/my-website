@@ -518,7 +518,7 @@ export default function AdminDashboard({ onBack }) {
       <div className="admin-main">
         <div className="admin-topbar">
           <span className="admin-topbar-title">
-            {user?.role === 'agent' ? 'My Tickets' : { all:'All Tickets', open:'Open', progress:'In Progress', closed:'Closed', unassigned:'Unassigned', high:'High Priority' }[activeNav]
+            {user?.role === 'agent' ? 'My Tickets' : { all:'All Tickets', open:'Open', progress:'In Progress', closed:'Closed', unassigned:'Unassigned', high:'High Priority' }[activeNav]}
           </span>
           <div className="admin-topbar-spacer" />
           <input className="admin-search" placeholder="Search tickets or names…" value={search} onChange={e => setSearch(e.target.value)} />
