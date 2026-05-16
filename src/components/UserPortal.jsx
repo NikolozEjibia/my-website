@@ -358,25 +358,35 @@ function ResolvedView({ onReset }) {
 }
 
 // ── Root ──────────────────────────────────────────────────────────
-export default function UserPortal({ onAdminClick }) {
-  const [userInfo,   setUserInfo]   = useState(null); // { firstName, lastName, department }
+export default function UserPortal({ onAdminClick, loggedInUser }) {
+  // if agent/admin is logged in, skip reg form
+  const [userInfo, setUserInfo] = useState(
+    loggedInUser
+      ? { firstName: loggedInUser.name, lastName: '', department: 'IT' }
+      : null
+  );
   const [screen,     setScreen]     = useState('form');
   const [wizCat,     setWizCat]     = useState(null);
   const [wizText,    setWizText]    = useState('');
   const [ticketRef,  setTicketRef]  = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Guest ticket creation — uses a fixed guest user_id from backend
   async function handleCreateTicket(text, category, via = 'direct') {
+    if (!text || !text.trim()) {
+      alert(via === 'direct' ? 'პრობლემის აღწერა შეიყვანეთ' : '');
+      return;
+    }
     setSubmitting(true);
     try {
       const data = await ticketsApi.createGuest({
-        title:       text || `${category} issue`,
-        description: text,
+        title:       text.trim().slice(0, 120) || `${category} issue`,
+        description: text.trim(),
         category:    category.charAt(0).toUpperCase() + category.slice(1),
         priority:    'med',
         via,
-        requester_name:       `${userInfo.firstName} ${userInfo.lastName}`,
+        requester_name:       userInfo.lastName
+          ? `${userInfo.firstName} ${userInfo.lastName}`
+          : userInfo.firstName,
         requester_department: userInfo.department,
       });
       setTicketRef(data.ticket.ref);
@@ -391,12 +401,13 @@ export default function UserPortal({ onAdminClick }) {
   function handleStartWizard(cat, text) { setWizCat(cat); setWizText(text); setScreen('wizard'); }
   function handleReset() { setScreen('form'); setWizCat(null); setWizText(''); setTicketRef(''); }
 
-  // Show registration form if user not identified yet
   if (!userInfo) {
     return <UserRegForm onEnter={setUserInfo} />;
   }
 
-  const userName = `${userInfo.firstName} ${userInfo.lastName}`;
+  const userName = userInfo.lastName
+    ? `${userInfo.firstName} ${userInfo.lastName}`
+    : userInfo.firstName;
 
   return (
     <div className="app-shell">

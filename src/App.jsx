@@ -19,16 +19,17 @@ function AppInner() {
 
   window.__goTo   = goTo;
   window.__logout = () => { logout(); goTo('portal'); };
-  window.__showAdminLogin = () => setShowAdminLogin(true);
 
-  // Admin is logged in and wants admin panel
   if (route === 'admin' && user && (user.role === 'admin' || user.role === 'agent')) {
     return <AdminDashboard onBack={() => goTo('portal')} />;
   }
 
   return (
     <>
-      <UserPortal onAdminClick={() => setShowAdminLogin(true)} />
+      <UserPortal
+        onAdminClick={() => setShowAdminLogin(true)}
+        loggedInUser={user && (user.role === 'admin' || user.role === 'agent') ? user : null}
+      />
       {showAdminLogin && (
         <AdminLoginModal
           onClose={() => setShowAdminLogin(false)}

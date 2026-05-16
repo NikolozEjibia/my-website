@@ -7,7 +7,6 @@ export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // on mount — restore session from localStorage
   useEffect(() => {
     const token = localStorage.getItem('hd_token');
     if (!token) { setLoading(false); return; }
