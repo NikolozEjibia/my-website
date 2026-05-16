@@ -292,6 +292,26 @@ function DetailPanel({ ticket, onClose, onUpdate, agents }) {
             <button className="btn-sm btn-sm-primary" onClick={addComment} disabled={saving}>
               {saving ? '...' : 'Add comment'}
             </button>
+<div style={{ marginTop: 16 }}>
+  <button
+    onClick={async () => {
+      if (!confirm(`წაიშალოს ticket ${ticket.ref}?`)) return;
+      try {
+        await ticketsApi.delete(ticket.id);
+        onClose();
+      } catch (err) {
+        alert('შეცდომა: ' + err.message);
+      }
+    }}
+    style={{
+      width: '100%', padding: '9px', fontSize: 13, fontWeight: 500,
+      background: '#FCEBEB', color: '#A32D2D',
+      border: '1px solid #F09595', borderRadius: 9, cursor: 'pointer',
+    }}
+  >
+    🗑 Ticket-ის წაშლა
+  </button>
+</div>
           </div>
         </div>
       </div>
