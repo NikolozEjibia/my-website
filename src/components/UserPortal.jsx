@@ -55,7 +55,7 @@ function TopNav({ onAdminClick, userName }) {
 }
 
 // ── User Registration Form ────────────────────────────────────────
-function UserRegForm({ onEnter }) {
+function UserRegForm({ onEnter, onAdminClick }) {
   const { lang } = useLang();
   const [firstName,   setFirstName]   = useState('');
   const [lastName,    setLastName]    = useState('');
@@ -142,7 +142,7 @@ function UserRegForm({ onEnter }) {
           <LangToggle />
           <button
             type="button"
-            onClick={() => window.__showAdminLogin?.() || document.dispatchEvent(new CustomEvent('showAdminLogin'))}
+            onClick={() => onAdminClick?.()}
             style={{
               background: 'none', border: '1px solid #D3D1C7',
               borderRadius: 8, padding: '5px 12px',
@@ -413,7 +413,7 @@ export default function UserPortal({ onAdminClick, loggedInUser }) {
   function handleReset() { setScreen('form'); setWizCat(null); setWizText(''); setTicketRef(''); }
 
   if (!userInfo) {
-    return <UserRegForm onEnter={setUserInfo} />;
+    return <UserRegForm onEnter={setUserInfo} onAdminClick={onAdminClick} />;
   }
 
   const userName = userInfo.lastName
