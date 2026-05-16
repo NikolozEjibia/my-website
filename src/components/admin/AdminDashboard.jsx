@@ -114,6 +114,7 @@ function Sidebar({ stats, activeNav, onNav, agents, onCreateAgent, onBack, onDel
           { id: 'closed',     icon: '✅', label: 'Closed' },
           { id: 'unassigned', icon: '👤', label: 'Unassigned',    badge: stats?.unassigned },
           { id: 'high',       icon: '🔴', label: 'High Priority', badge: stats?.highPriority },
+                    { id: 'reports', icon: '📊', label: 'Reports', badge: null },
         ].map(item => (
           <button key={item.id} className={`sidebar-link${activeNav === item.id ? ' active' : ''}`} onClick={() => onNav(item.id)}>
             <span className="sidebar-link-icon">{item.icon}</span>
@@ -155,7 +156,116 @@ function Sidebar({ stats, activeNav, onNav, agents, onCreateAgent, onBack, onDel
     </aside>
   );
 }
+// ── Reporting View ────────────────────────────────────────────────
+function ReportingView({ onClose }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState('week');
 
+  useEffect(() => {
+    ticketsApi.stats().then(s => { setData(s); setLoading(false); });
+  }, []);
+
+  const periodLabels = { day: 'დღეს', week: 'კვირაში', month: 'თვეში' };
+
+  if (loading) return (
+    <div style={{ padding: 40, textAlign: 'center', color: '#888780', fontFamily: 'DM Sans, sans-serif' }}>იტვირთება...</div>
+  );
+
+  const cats = data?.byCategory || [];
+  const total = cats.reduce((s, c) => s + c.count, 0) || 1;
+
+  const colors = { WiFi:'#185FA5', Hardware:'#0F6E56', Software:'#BA7517', Account:'#A32D2D', Printer:'#5F5E5A', Other:'#888780' };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(44,44,42,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'DM Sans, sans-serif',
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: '#F5F3EE', borderRadius: 16, width: '90%', maxWidth: 680,
+        maxHeight: '90vh', overflow: 'auto',
+        boxShadow: '0 8px 40px rgba(44,44,42,0.18)',
+      }}>
+        {/* Header */}
+        <div style={{ background: 'white', padding: '20px 24px', borderRadius: '16px 16px 0 0', borderBottom: '1px solid rgba(68,68,65,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 500 }}>📊 Reporting & Analytics</div>
+            <div style={{ fontSize: 12, color: '#888780', marginTop: 2 }}>Ticket სტატისტიკა</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#888780' }}>✕</button>
+        </div>
+
+        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Stats overview */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+            {[
+              { label: 'სულ', val: data.total,    color: '#185FA5', bg: '#E6F1FB' },
+              { label: 'ღია',  val: data.open,     color: '#BA7517', bg: '#FAEEDA' },
+              { label: 'პროცესი', val: data.progress, color: '#BA7517', bg: '#FAEEDA' },
+              { label: 'დახურული', val: data.closed,  color: '#0F6E56', bg: '#E1F5EE' },
+            ].map(s => (
+              <div key={s.label} style={{ background: 'white', borderRadius: 12, padding: '14px 16px', border: '1px solid rgba(68,68,65,0.08)' }}>
+                <div style={{ fontSize: 11, color: '#888780', marginBottom: 4 }}>{s.label}</div>
+                <div style={{ fontSize: 26, fontWeight: 300, color: s.color }}>{s.val}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Category breakdown */}
+          <div style={{ background: 'white', borderRadius: 12, padding: '18px 20px', border: '1px solid rgba(68,68,65,0.08)' }}>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 14 }}>კატეგორიების განაწილება</div>
+            {cats.map(c => (
+              <div key={c.category} style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
+                  <span>{c.category}</span>
+                  <span style={{ color: '#888780' }}>{c.count} ({Math.round(c.count/total*100)}%)</span>
+                </div>
+                <div style={{ height: 6, background: '#F5F3EE', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${Math.round(c.count/total*100)}%`, background: colors[c.category] || '#185FA5', borderRadius: 3, transition: 'width 0.5s' }} />
+                </div>
+              </div>
+            ))}
+            {cats.length === 0 && <div style={{ color: '#888780', fontSize: 13 }}>მონაცემები არ არის</div>}
+          </div>
+
+          {/* Resolution rate */}
+          <div style={{ background: 'white', borderRadius: 12, padding: '18px 20px', border: '1px solid rgba(68,68,65,0.08)' }}>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 14 }}>გადაჭრის მაჩვენებელი</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+                <svg viewBox="0 0 36 36" style={{ width: 80, height: 80, transform: 'rotate(-90deg)' }}>
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F5F3EE" strokeWidth="3" />
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="#0F6E56" strokeWidth="3"
+                    strokeDasharray={`${Math.round(data.closed/Math.max(data.total,1)*100)} 100`}
+                    strokeLinecap="round" />
+                </svg>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 500, color: '#0F6E56' }}>
+                  {Math.round(data.closed/Math.max(data.total,1)*100)}%
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 13, color: '#444441', marginBottom: 4 }}>
+                  <strong>{data.closed}</strong> ticket გადაჭრილია <strong>{data.total}</strong>-დან
+                </div>
+                <div style={{ fontSize: 12, color: '#888780' }}>
+                  {data.unassigned} ticket მინიჭების გარეშეა
+                </div>
+                <div style={{ fontSize: 12, color: '#888780' }}>
+                  {data.highPriority} მაღალი პრიორიტეტის ticket-ი ღიაა
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
 function StatusBadge({ status }) {
   const cls = status === 'in-progress' ? 'progress' : status;
   return <span className={`badge ${cls}`}><span className="badge-dot" />{STATUS_LABELS[status]}</span>;
@@ -333,21 +443,24 @@ export default function AdminDashboard({ onBack }) {
   const [catFilter,    setCatFilter]    = useState('');
   const [prioFilter,   setPrioFilter]   = useState('');
   const [showCreate,   setShowCreate]   = useState(false);
+    const [showReports, setShowReports] = useState(false);
 
   async function loadData() {
-    try {
-      const [ticketData, statsData, agentData] = await Promise.all([
-        ticketsApi.list(),
-        ticketsApi.stats(),
-        usersApi.agents(),
-      ]);
-      setTickets(ticketData.tickets || []);
-      setStats(statsData);
-      setAgents(agentData.users || []);
-    } finally {
-      setLoading(false);
-    }
+  try {
+    const [ticketData, statsData, agentData] = await Promise.all([
+      user?.role === 'agent'
+        ? ticketsApi.list({ assignee: 'me' })
+        : ticketsApi.list(),
+      ticketsApi.stats(),
+      usersApi.agents(),
+    ]);
+    setTickets(ticketData.tickets || []);
+    setStats(statsData);
+    setAgents(agentData.users || []);
+  } finally {
+    setLoading(false);
   }
+}
 
   useEffect(() => { loadData(); }, []);
 
@@ -388,7 +501,7 @@ export default function AdminDashboard({ onBack }) {
   return (
     <div className="admin-shell">
       <Sidebar
-        stats={stats} activeNav={activeNav} onNav={setActiveNav}
+        stats={stats} activeNav={activeNav} onNav={(id) => { if (id === 'reports') setShowReports(true); else setActiveNav(id); }}
         agents={agents} onCreateAgent={() => setShowCreate(true)}
         onBack={onBack}
         onDeleteAgent={async (id, name) => {
@@ -405,7 +518,7 @@ export default function AdminDashboard({ onBack }) {
       <div className="admin-main">
         <div className="admin-topbar">
           <span className="admin-topbar-title">
-            {{ all:'All Tickets', open:'Open', progress:'In Progress', closed:'Closed', unassigned:'Unassigned', high:'High Priority' }[activeNav]}
+            {user?.role === 'agent' ? 'My Tickets' : { all:'All Tickets', open:'Open', progress:'In Progress', closed:'Closed', unassigned:'Unassigned', high:'High Priority' }[activeNav]
           </span>
           <div className="admin-topbar-spacer" />
           <input className="admin-search" placeholder="Search tickets or names…" value={search} onChange={e => setSearch(e.target.value)} />
@@ -528,6 +641,7 @@ export default function AdminDashboard({ onBack }) {
           onCreated={newAgent => setAgents(a => [...a, newAgent])}
         />
       )}
+{showReports && <ReportingView onClose={() => setShowReports(false)} />}
 {/* Mobile bottom nav */}
       <nav className="mobile-nav">
         <div className="mobile-nav-items">
