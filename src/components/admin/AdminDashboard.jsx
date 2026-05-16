@@ -1,13 +1,97 @@
 import { useState, useEffect, useMemo } from 'react';
-import { tickets as ticketsApi, users as usersApi, comments as commentsApi } from '../../api/client';
+import { tickets as ticketsApi, users as usersApi, comments as commentsApi, auth as authApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/admin.css';
 
 const STATUS_LABELS = { open: 'Open', 'in-progress': 'In Progress', closed: 'Closed' };
 
+// ── Create Agent Modal ────────────────────────────────────────────
+function CreateAgentModal({ onClose, onCreated }) {
+  const [name,     setName]     = useState('');
+  const [email,    setEmail]    = useState('');
+  const [password, setPassword] = useState('');
+  const [role,     setRole]     = useState('agent');
+  const [error,    setError]    = useState('');
+  const [loading,  setLoading]  = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const data = await usersApi.create({ name, email, password, role });
+      onCreated(data.user);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 300,
+      background: 'rgba(44,44,42,0.45)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'DM Sans, sans-serif',
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: 'white', borderRadius: 16, padding: '32px 28px',
+        width: 380, boxShadow: '0 8px 40px rgba(44,44,42,0.15)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 500 }}>ახალი Support / Agent</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#888780' }}>✕</button>
+        </div>
+
+        {error && (
+          <div style={{ background: '#FCEBEB', border: '1px solid #F09595', borderRadius: 8, padding: '9px 12px', fontSize: 13, color: '#A32D2D', marginBottom: 14 }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          {[
+            { label: 'სახელი გვარი', val: name, set: setName, type: 'text', ph: 'Giorgi Beridze' },
+            { label: 'Email',        val: email, set: setEmail, type: 'email', ph: 'giorgi@company.com' },
+            { label: 'პაროლი',       val: password, set: setPassword, type: 'password', ph: 'მინ. 6 სიმბოლო' },
+          ].map(f => (
+            <div key={f.label} style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: '#444441', display: 'block', marginBottom: 5 }}>{f.label}</label>
+              <input
+                type={f.type} required value={f.val} onChange={e => f.set(e.target.value)}
+                placeholder={f.ph}
+                style={{ width: '100%', padding: '9px 12px', fontSize: 14, border: '1px solid #D3D1C7', borderRadius: 9, background: '#FAFAF8', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+          ))}
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ fontSize: 13, fontWeight: 500, color: '#444441', display: 'block', marginBottom: 5 }}>როლი</label>
+            <select value={role} onChange={e => setRole(e.target.value)}
+              style={{ width: '100%', padding: '9px 12px', fontSize: 14, border: '1px solid #D3D1C7', borderRadius: 9, background: '#FAFAF8', outline: 'none', boxSizing: 'border-box' }}>
+              <option value="agent">Agent (Support)</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          <button type="submit" disabled={loading} style={{
+            width: '100%', padding: '10px', fontSize: 14, fontWeight: 500,
+            background: loading ? '#B5D4F4' : '#185FA5', color: 'white',
+            border: 'none', borderRadius: 9, cursor: loading ? 'not-allowed' : 'pointer',
+          }}>
+            {loading ? 'იქმნება...' : 'შექმნა'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Sidebar ───────────────────────────────────────────────────────
-function Sidebar({ stats, activeNav, onNav, agents }) {
-  const { user, logout } = useAuth();
+function Sidebar({ stats, activeNav, onNav, agents, onCreateAgent, onBack }) {
+  const { logout } = useAuth();
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
@@ -26,29 +110,39 @@ function Sidebar({ stats, activeNav, onNav, agents }) {
           { id: 'all',        icon: '🎫', label: 'All Tickets',   badge: stats?.total },
           { id: 'open',       icon: '📬', label: 'Open',          badge: stats?.open,        badgeClass: stats?.open > 0 ? 'red' : '' },
           { id: 'progress',   icon: '⚡', label: 'In Progress',   badge: stats?.progress },
-          { id: 'closed',     icon: '✅', label: 'Closed',        badge: null },
+          { id: 'closed',     icon: '✅', label: 'Closed' },
           { id: 'unassigned', icon: '👤', label: 'Unassigned',    badge: stats?.unassigned },
           { id: 'high',       icon: '🔴', label: 'High Priority', badge: stats?.highPriority },
         ].map(item => (
           <button key={item.id} className={`sidebar-link${activeNav === item.id ? ' active' : ''}`} onClick={() => onNav(item.id)}>
             <span className="sidebar-link-icon">{item.icon}</span>
             {item.label}
-            {item.badge != null && item.badge > 0 && (
+            {item.badge > 0 && (
               <span className={`sidebar-badge${item.badgeClass ? ' ' + item.badgeClass : ''}`}>{item.badge}</span>
             )}
           </button>
         ))}
       </div>
 
-      <div className="sidebar-agents">
-        <div className="sidebar-agents-label">Team</div>
+      <div className="sidebar-section">
+        <div className="sidebar-section-label">Team</div>
         {agents.map(a => (
           <div key={a.id} className="agent-row">
             <div className="agent-avatar" style={{ background: '#185FA5' }}>{a.avatar || a.name.slice(0,2).toUpperCase()}</div>
             <span className="agent-name">{a.name}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: '#B4B2A9', background: '#F5F3EE', padding: '1px 6px', borderRadius: 4 }}>{a.role}</span>
           </div>
         ))}
-        <button className="sidebar-link" style={{ marginTop: 8, color: 'var(--red-600)' }} onClick={logout}>
+        <button className="sidebar-link" style={{ marginTop: 8, color: 'var(--blue-600)' }} onClick={onCreateAgent}>
+          <span className="sidebar-link-icon">➕</span> Support-ის დამატება
+        </button>
+      </div>
+
+      <div style={{ padding: '12px 10px', marginTop: 'auto', borderTop: '1px solid rgba(68,68,65,0.08)' }}>
+        <button className="sidebar-link" onClick={onBack} style={{ color: 'var(--gray-600)' }}>
+          <span className="sidebar-link-icon">←</span> User Portal
+        </button>
+        <button className="sidebar-link" onClick={() => { logout(); onBack(); }} style={{ color: 'var(--red-600)' }}>
           <span className="sidebar-link-icon">🚪</span> გასვლა
         </button>
       </div>
@@ -116,6 +210,21 @@ function DetailPanel({ ticket, onClose, onUpdate, agents }) {
         </div>
 
         <div className="detail-body">
+          {/* Requester info */}
+          {(ticket.requesterName || ticket.requesterDepartment) && (
+            <div className="detail-section">
+              <div className="detail-section-label">მომთხოვნი</div>
+              <div style={{ background: '#F5F3EE', borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 2 }}>
+                  👤 {ticket.requesterName || '—'}
+                </div>
+                <div style={{ fontSize: 12, color: '#888780' }}>
+                  🏢 {ticket.requesterDepartment || '—'}
+                </div>
+              </div>
+            </div>
+          )}
+
           {ticket.description && (
             <div className="detail-section">
               <div className="detail-section-label">Description</div>
@@ -127,9 +236,8 @@ function DetailPanel({ ticket, onClose, onUpdate, agents }) {
             <div className="detail-section-label">Details</div>
             {[
               ['Category', ticket.category],
-              ['Submitted by', ticket.user?.name || '—'],
-              ['Created', ticket.createdAt?.slice(0, 16).replace('T', ' ')],
-              ['Updated', ticket.updatedAt?.slice(0, 16).replace('T', ' ')],
+              ['Created',  ticket.createdAt?.slice(0, 16).replace('T', ' ')],
+              ['Updated',  ticket.updatedAt?.slice(0, 16).replace('T', ' ')],
             ].map(([l, v]) => (
               <div className="detail-field" key={l}>
                 <span className="detail-field-label">{l}</span>
@@ -156,7 +264,7 @@ function DetailPanel({ ticket, onClose, onUpdate, agents }) {
             <div className="detail-section-label">Assigned to</div>
             <select className="detail-assign-select" value={localAssignee} onChange={e => changeAssignee(e.target.value)}>
               <option value="">— Unassigned</option>
-              {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              {agents.map(a => <option key={a.id} value={a.id}>{a.name} ({a.role})</option>)}
             </select>
           </div>
 
@@ -186,8 +294,8 @@ function DetailPanel({ ticket, onClose, onUpdate, agents }) {
   );
 }
 
-// ── Main Dashboard ────────────────────────────────────────────────
-export default function AdminDashboard() {
+// ── Main ──────────────────────────────────────────────────────────
+export default function AdminDashboard({ onBack }) {
   const [tickets,      setTickets]      = useState([]);
   const [stats,        setStats]        = useState(null);
   const [agents,       setAgents]       = useState([]);
@@ -198,6 +306,7 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState('');
   const [catFilter,    setCatFilter]    = useState('');
   const [prioFilter,   setPrioFilter]   = useState('');
+  const [showCreate,   setShowCreate]   = useState(false);
 
   async function loadData() {
     try {
@@ -222,12 +331,10 @@ export default function AdminDashboard() {
   }
 
   async function openDetail(ticket) {
-    // load with comments
     const data = await ticketsApi.get(ticket.id);
     setSelected(data.ticket);
   }
 
-  // nav filter
   const navFiltered = useMemo(() => tickets.filter(t => {
     if (activeNav === 'open')       return t.status === 'open';
     if (activeNav === 'progress')   return t.status === 'in-progress';
@@ -237,27 +344,28 @@ export default function AdminDashboard() {
     return true;
   }), [tickets, activeNav]);
 
-  // search + filters
   const displayed = useMemo(() => navFiltered.filter(t => {
     const q = search.toLowerCase();
-    const matchSearch = !q || t.title.toLowerCase().includes(q) || (t.ref||'').toLowerCase().includes(q);
+    const matchSearch = !q || t.title.toLowerCase().includes(q) || (t.ref||'').toLowerCase().includes(q) || (t.requesterName||'').toLowerCase().includes(q);
     const matchStatus = !statusFilter || t.status === statusFilter;
     const matchCat    = !catFilter    || t.category === catFilter;
     const matchPrio   = !prioFilter   || t.priority === prioFilter;
     return matchSearch && matchStatus && matchCat && matchPrio;
   }), [navFiltered, search, statusFilter, catFilter, prioFilter]);
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F3EE', fontFamily: 'DM Sans, sans-serif', color: '#888780' }}>
-        იტვირთება...
-      </div>
-    );
-  }
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F3EE', fontFamily: 'DM Sans, sans-serif', color: '#888780' }}>
+      იტვირთება...
+    </div>
+  );
 
   return (
     <div className="admin-shell">
-      <Sidebar stats={stats} activeNav={activeNav} onNav={setActiveNav} agents={agents} />
+      <Sidebar
+        stats={stats} activeNav={activeNav} onNav={setActiveNav}
+        agents={agents} onCreateAgent={() => setShowCreate(true)}
+        onBack={onBack}
+      />
 
       <div className="admin-main">
         <div className="admin-topbar">
@@ -265,13 +373,12 @@ export default function AdminDashboard() {
             {{ all:'All Tickets', open:'Open', progress:'In Progress', closed:'Closed', unassigned:'Unassigned', high:'High Priority' }[activeNav]}
           </span>
           <div className="admin-topbar-spacer" />
-          <input className="admin-search" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} />
-          <button className="btn-sm btn-sm-primary" onClick={loadData} style={{ marginLeft: 8 }}>↻ Refresh</button>
-          <div className="topbar-avatar" title="Admin">IT</div>
+          <input className="admin-search" placeholder="Search tickets or names…" value={search} onChange={e => setSearch(e.target.value)} />
+          <button className="btn-sm btn-sm-primary" onClick={loadData} style={{ marginLeft: 8 }}>↻</button>
+          <div className="topbar-avatar">IT</div>
         </div>
 
         <div className="admin-content">
-          {/* Stats */}
           <div className="stats-grid">
             {[
               { label: 'Total tickets',  val: stats?.total    || 0, cls: 'blue'  },
@@ -286,7 +393,6 @@ export default function AdminDashboard() {
             ))}
           </div>
 
-          {/* Table */}
           <div className="section-card">
             <div className="section-header">
               <span className="section-header-title">{displayed.length} ticket{displayed.length !== 1 ? 's' : ''}</span>
@@ -319,10 +425,11 @@ export default function AdminDashboard() {
                 <tr>
                   <th style={{ width: 80 }}>ID</th>
                   <th>Title</th>
-                  <th style={{ width: 120 }}>Status</th>
+                  <th style={{ width: 130 }}>მომთხოვნი</th>
+                  <th style={{ width: 80 }}>დეპარტ.</th>
+                  <th style={{ width: 110 }}>Status</th>
                   <th style={{ width: 90 }}>Priority</th>
                   <th style={{ width: 150 }}>Assigned to</th>
-                  <th style={{ width: 90 }}>Source</th>
                 </tr>
               </thead>
               <tbody>
@@ -333,6 +440,8 @@ export default function AdminDashboard() {
                       <div className="ticket-title">{t.title}</div>
                       <div className="ticket-meta">{t.category} · {t.createdAt?.slice(0,10)}</div>
                     </td>
+                    <td style={{ fontSize: 13 }}>{t.requesterName || '—'}</td>
+                    <td style={{ fontSize: 12, color: '#888780' }}>{t.requesterDepartment || '—'}</td>
                     <td><StatusBadge status={t.status} /></td>
                     <td><PriorityBadge priority={t.priority} /></td>
                     <td onClick={e => e.stopPropagation()}>
@@ -342,8 +451,7 @@ export default function AdminDashboard() {
                             {t.assignee.avatar || t.assignee.name?.slice(0,2)}
                           </div>
                         )}
-                        <select className="assign-select"
-                          value={t.assignee?.id || ''}
+                        <select className="assign-select" value={t.assignee?.id || ''}
                           onChange={async e => {
                             const val = e.target.value;
                             await ticketsApi.update(t.id, { assignee_id: val ? Number(val) : null });
@@ -355,10 +463,9 @@ export default function AdminDashboard() {
                         </select>
                       </div>
                     </td>
-                    <td><span className={`via-badge ${t.via}`}>{t.via === 'wizard' ? '🔧 wizard' : '✍️ direct'}</span></td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={6}><div className="table-empty">No tickets found.</div></td></tr>
+                  <tr><td colSpan={7}><div className="table-empty">No tickets found.</div></td></tr>
                 )}
               </tbody>
             </table>
@@ -368,6 +475,13 @@ export default function AdminDashboard() {
 
       {selected && (
         <DetailPanel ticket={selected} agents={agents} onClose={() => setSelected(null)} onUpdate={updateTicket} />
+      )}
+
+      {showCreate && (
+        <CreateAgentModal
+          onClose={() => setShowCreate(false)}
+          onCreated={newAgent => setAgents(a => [...a, newAgent])}
+        />
       )}
     </div>
   );

@@ -2,7 +2,7 @@ const BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 const getToken = () => localStorage.getItem('hd_token');
 
-async function request(method, path, body) {
+async function request(method, path, body, requireAuth = true) {
   const headers = { 'Content-Type': 'application/json' };
   const token = getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -25,11 +25,18 @@ const del   = (path)       => request('DELETE', path);
 
 export const auth = {
   login:    (email, password) => post('/auth/login',    { email, password }),
-  register: (name, email, password) => post('/auth/register', { name, email, password }),
+  register: (name, email, password, role) => post('/auth/register', { name, email, password, role }),
   me:       () => get('/auth/me'),
 };
 
 export const tickets = {
+  // Guest ticket (no auth needed)
+  createGuest: (body) => fetch(`${BASE}/tickets/guest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }),
+
   list:   (params = {}) => get('/tickets?' + new URLSearchParams(params).toString()),
   stats:  ()            => get('/tickets/stats'),
   get:    (id)          => get(`/tickets/${id}`),
@@ -45,7 +52,9 @@ export const comments = {
 };
 
 export const users = {
-  agents: ()          => get('/users'),
-  get:    (id)        => get(`/users/${id}`),
-  update: (id, body)  => patch(`/users/${id}`, body),
+  agents:   ()          => get('/users'),
+  get:      (id)        => get(`/users/${id}`),
+  update:   (id, body)  => patch(`/users/${id}`, body),
+  create:   (body)      => post('/users/create', body),
+  delete:   (id)        => del(`/users/${id}`),
 };

@@ -1,51 +1,45 @@
 import { useState } from 'react';
 import { LangProvider } from './context/LangContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import LoginPage from './components/LoginPage';
 import UserPortal from './components/UserPortal';
 import AdminDashboard from './components/admin/AdminDashboard';
+import AdminLoginModal from './components/AdminLoginModal';
 
 function AppInner() {
-  const { user, loading, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [route, setRoute] = useState(
     window.location.hash === '#/admin' ? 'admin' : 'portal'
   );
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
 
   function goTo(r) {
     window.location.hash = r === 'admin' ? '#/admin' : '#/portal';
     setRoute(r);
   }
+
   window.__goTo   = goTo;
-  window.__logout = logout;
+  window.__logout = () => { logout(); goTo('portal'); };
+  window.__showAdminLogin = () => setShowAdminLogin(true);
 
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', background: '#F5F3EE',
-        fontFamily: 'DM Sans, sans-serif', color: '#888780', fontSize: 14,
-      }}>
-        იტვირთება...
-      </div>
-    );
+  // Admin is logged in and wants admin panel
+  if (route === 'admin' && user && (user.role === 'admin' || user.role === 'agent')) {
+    return <AdminDashboard onBack={() => goTo('portal')} />;
   }
 
-  // not logged in → show login
-  if (!user) {
-    return <LoginPage onSuccess={(u) => {
-      // after login, route by role
-      if (u.role === 'admin' || u.role === 'agent') goTo('admin');
-      else goTo('portal');
-    }} />;
-  }
-
-  // admin/agent → admin dashboard
-  if (route === 'admin' && (user.role === 'admin' || user.role === 'agent')) {
-    return <AdminDashboard />;
-  }
-
-  // regular user → portal
-  return <UserPortal />;
+  return (
+    <>
+      <UserPortal onAdminClick={() => setShowAdminLogin(true)} />
+      {showAdminLogin && (
+        <AdminLoginModal
+          onClose={() => setShowAdminLogin(false)}
+          onSuccess={(u) => {
+            setShowAdminLogin(false);
+            goTo('admin');
+          }}
+        />
+      )}
+    </>
+  );
 }
 
 export default function App() {

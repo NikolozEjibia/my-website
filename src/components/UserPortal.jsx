@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react';
 import { categories, flows } from '../data/flows';
 import { useLang } from '../context/LangContext';
-import { useAuth } from '../context/AuthContext';
 import { tickets as ticketsApi } from '../api/client';
 import '../styles/portal.css';
+
+const DEPARTMENTS = ['IT', 'HR', 'Finance', 'Sales', 'Marketing', 'Operations', 'Other'];
 
 function detectCat(text) {
   const lower = text.toLowerCase();
@@ -13,7 +14,7 @@ function detectCat(text) {
   return null;
 }
 
-// ── Language toggle ───────────────────────────────────────────────
+// ── Lang toggle ───────────────────────────────────────────────────
 function LangToggle() {
   const { lang, setLang } = useLang();
   return (
@@ -26,9 +27,8 @@ function LangToggle() {
 }
 
 // ── Top nav ───────────────────────────────────────────────────────
-function TopNav({ view, onSwitch }) {
+function TopNav({ onAdminClick, userName }) {
   const { t } = useLang();
-  const { user, logout } = useAuth();
   return (
     <nav className="topnav">
       <a className="topnav-logo" href="#">
@@ -39,17 +39,110 @@ function TopNav({ view, onSwitch }) {
         <span className="logo-badge">BETA</span>
       </a>
       <div className="topnav-spacer" />
-      <button className={`topnav-link${view === 'portal' ? ' active' : ''}`} onClick={() => onSwitch('portal')}>{t('nav_portal')}</button>
-      <button className={`topnav-link${view === 'status' ? ' active' : ''}`} onClick={() => onSwitch('status')}>{t('nav_tickets')}</button>
-      {(user?.role === 'admin' || user?.role === 'agent') && (
-        <button className="topnav-link" style={{ background: 'var(--blue-50)', color: 'var(--blue-600)', border: '1px solid var(--blue-100)' }}
-          onClick={() => window.__goTo?.('admin')}>{t('nav_admin')}</button>
+      {userName && (
+        <span style={{ fontSize: 13, color: 'var(--gray-600)' }}>👤 {userName}</span>
       )}
-      <button className="topnav-link" onClick={logout} style={{ color: 'var(--gray-400)' }}>
-        {user?.name} · გასვლა
+      <button
+        className="topnav-link"
+        style={{ background: 'var(--blue-50)', color: 'var(--blue-600)', border: '1px solid var(--blue-100)' }}
+        onClick={onAdminClick}
+      >
+        🔐 Admin
       </button>
       <LangToggle />
     </nav>
+  );
+}
+
+// ── User Registration Form ────────────────────────────────────────
+function UserRegForm({ onEnter }) {
+  const { lang } = useLang();
+  const [firstName,   setFirstName]   = useState('');
+  const [lastName,    setLastName]    = useState('');
+  const [department,  setDepartment]  = useState('');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!firstName.trim() || !lastName.trim() || !department) return;
+    onEnter({ firstName: firstName.trim(), lastName: lastName.trim(), department });
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F3EE', fontFamily: 'var(--font-sans)' }}>
+      <div style={{
+        background: 'white', borderRadius: 16, padding: '40px 36px',
+        width: 420, border: '1px solid rgba(68,68,65,0.10)',
+        boxShadow: '0 4px 24px rgba(44,44,42,0.07)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+          <div style={{ width: 36, height: 36, background: '#185FA5', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="white">
+              <path d="M8 1L1 5v6l7 4 7-4V5L8 1zm0 2.1 5 2.86V11L8 13.9 3 11V5.96L8 3.1z"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 500 }}>HelpDesk IQ</div>
+            <div style={{ fontSize: 11, color: '#888780' }}>IT Support Portal</div>
+          </div>
+        </div>
+
+        <h2 style={{ fontSize: 20, fontWeight: 500, marginBottom: 6, letterSpacing: -0.02 }}>
+          {lang === 'ka' ? 'მოგესალმებით!' : 'Welcome!'}
+        </h2>
+        <p style={{ fontSize: 13, color: '#888780', marginBottom: 24 }}>
+          {lang === 'ka' ? 'გაგრძელებისთვის შეავსეთ თქვენი ინფორმაცია' : 'Please fill in your details to continue'}
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, color: '#444441', display: 'block', marginBottom: 5 }}>
+                {lang === 'ka' ? 'სახელი' : 'First name'}
+              </label>
+              <input
+                required value={firstName} onChange={e => setFirstName(e.target.value)}
+                placeholder={lang === 'ka' ? 'სახელი' : 'John'}
+                style={{ width: '100%', padding: '9px 12px', fontSize: 14, border: '1px solid #D3D1C7', borderRadius: 9, background: '#FAFAF8', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, color: '#444441', display: 'block', marginBottom: 5 }}>
+                {lang === 'ka' ? 'გვარი' : 'Last name'}
+              </label>
+              <input
+                required value={lastName} onChange={e => setLastName(e.target.value)}
+                placeholder={lang === 'ka' ? 'გვარი' : 'Doe'}
+                style={{ width: '100%', padding: '9px 12px', fontSize: 14, border: '1px solid #D3D1C7', borderRadius: 9, background: '#FAFAF8', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ fontSize: 13, fontWeight: 500, color: '#444441', display: 'block', marginBottom: 5 }}>
+              {lang === 'ka' ? 'დეპარტამენტი' : 'Department'}
+            </label>
+            <select
+              required value={department} onChange={e => setDepartment(e.target.value)}
+              style={{ width: '100%', padding: '9px 12px', fontSize: 14, border: '1px solid #D3D1C7', borderRadius: 9, background: '#FAFAF8', outline: 'none', boxSizing: 'border-box', color: department ? '#2C2C2A' : '#B4B2A9' }}
+            >
+              <option value="" disabled>{lang === 'ka' ? 'აირჩიეთ დეპარტამენტი' : 'Select department'}</option>
+              {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+
+          <button type="submit" style={{
+            width: '100%', padding: '11px', fontSize: 14, fontWeight: 500,
+            background: '#185FA5', color: 'white', border: 'none', borderRadius: 9, cursor: 'pointer',
+          }}>
+            {lang === 'ka' ? 'გაგრძელება →' : 'Continue →'}
+          </button>
+        </form>
+
+        <div style={{ marginTop: 16, textAlign: 'right' }}>
+          <LangToggle />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -132,7 +225,6 @@ function WizardView({ category, problemText, onBack, onCreateTicket, onResolved 
   const { t, lang } = useLang();
   const flow    = flows[category] || flows.other;
   const catInfo = categories.find(c => c.id === category) || categories[5];
-
   const [stepId,  setStepId]  = useState('s0');
   const [result,  setResult]  = useState(null);
   const [history, setHistory] = useState([]);
@@ -142,9 +234,9 @@ function WizardView({ category, problemText, onBack, onCreateTicket, onResolved 
   const total       = flow.steps.length;
   const progress    = result ? 100 : Math.round(((stepIndex + 1) / (total + 1)) * 100);
 
-  const q      = step => lang === 'ka' ? (step.q_ka   || step.q)     : step.q;
-  const rTitle = r    => lang === 'ka' ? (r.title_ka  || r.title)    : r.title;
-  const rDesc  = r    => lang === 'ka' ? (r.desc_ka   || r.desc)     : r.desc;
+  const q      = step => lang === 'ka' ? (step.q_ka   || step.q)    : step.q;
+  const rTitle = r    => lang === 'ka' ? (r.title_ka  || r.title)   : r.title;
+  const rDesc  = r    => lang === 'ka' ? (r.desc_ka   || r.desc)    : r.desc;
 
   function answer(yes) {
     const next = yes ? currentStep.yes : currentStep.no;
@@ -171,7 +263,6 @@ function WizardView({ category, problemText, onBack, onCreateTicket, onResolved 
             </div>
             <div className="progress-track"><div className="progress-bar" style={{ width: `${progress}%` }} /></div>
           </div>
-
           {history.length > 0 && (
             <div className="step-trail">
               {history.map((h, i) => (
@@ -179,7 +270,6 @@ function WizardView({ category, problemText, onBack, onCreateTicket, onResolved 
               ))}
             </div>
           )}
-
           <div className="wizard-body">
             {!result ? (
               <>
@@ -221,7 +311,7 @@ function WizardView({ category, problemText, onBack, onCreateTicket, onResolved 
   );
 }
 
-// ── Success screen ────────────────────────────────────────────────
+// ── Success ───────────────────────────────────────────────────────
 function SuccessView({ ticketRef, onReset }) {
   const { t } = useLang();
   return (
@@ -245,7 +335,7 @@ function SuccessView({ ticketRef, onReset }) {
   );
 }
 
-// ── Resolved screen ───────────────────────────────────────────────
+// ── Resolved ──────────────────────────────────────────────────────
 function ResolvedView({ onReset }) {
   const { t } = useLang();
   return (
@@ -267,99 +357,27 @@ function ResolvedView({ onReset }) {
   );
 }
 
-// ── My Tickets ────────────────────────────────────────────────────
-function StatusView() {
-  const { t, lang } = useLang();
-  const [myTickets, setMyTickets] = useState([]);
-  const [loading,   setLoading]   = useState(true);
-
-  useState(() => {
-    ticketsApi.list().then(data => {
-      setMyTickets(data.tickets || []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
-
-  const statusLabel = { open: t('ticket_submitted'), 'in-progress': t('ticket_inprogress'), closed: t('ticket_resolved') };
-  const steps = [t('ticket_submitted'), t('ticket_assigned'), t('ticket_inprogress'), t('ticket_resolved')];
-
-  return (
-    <>
-      <div className="hero">
-        <div className="hero-eyebrow">{t('tickets_eyebrow')}</div>
-        <h1>{t('tickets_title1')}<strong>{t('tickets_title2')}</strong></h1>
-        <p className="hero-sub">{t('tickets_sub')}</p>
-      </div>
-      <div className="portal-main">
-        {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--gray-400)' }}>იტვირთება...</div>}
-        {!loading && myTickets.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--gray-400)', fontSize: 14 }}>
-            ჯერ ტიკეტი არ გაქვს გაგზავნილი.
-          </div>
-        )}
-        {myTickets.map(ticket => {
-          const activeIdx = ticket.status === 'closed' ? 4 : ticket.status === 'in-progress' ? 2 : 1;
-          return (
-            <div className="card" key={ticket.id} style={{ marginBottom: 12 }}>
-              <div className="card-header">
-                <div className="card-icon" style={{ fontSize: 14 }}>🎫</div>
-                <div style={{ flex: 1 }}>
-                  <div className="card-title">{ticket.title}</div>
-                  <div className="card-subtitle" style={{ display: 'flex', gap: 10 }}>
-                    <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{ticket.ref}</span>
-                    <span>·</span><span>{ticket.category}</span>
-                    <span>·</span><span>{statusLabel[ticket.status]}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="card-body" style={{ paddingTop: 16 }}>
-                {steps.map((s, i) => {
-                  const done   = i < activeIdx;
-                  const active = i === activeIdx - 1 && ticket.status !== 'closed';
-                  const future = i >= activeIdx && ticket.status !== 'closed';
-                  const dotCls = done || ticket.status === 'closed' ? 'done' : active ? 'active' : 'future';
-                  return (
-                    <div className="status-row" key={s}>
-                      <div className="status-dot-col">
-                        <div className={`status-dot ${dotCls}`} />
-                        {i < steps.length - 1 && <div className="status-connector" />}
-                      </div>
-                      <div>
-                        <div className={`status-label${future ? ' future' : ''}`}>{s}</div>
-                        {(done || active) && (
-                          <div className="status-time">{i === 0 ? ticket.createdAt?.slice(0,10) : '—'}</div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
 // ── Root ──────────────────────────────────────────────────────────
-export default function UserPortal() {
-  const [navView,  setNavView]  = useState('portal');
-  const [screen,   setScreen]   = useState('form');
-  const [wizCat,   setWizCat]   = useState(null);
-  const [wizText,  setWizText]  = useState('');
-  const [ticketRef, setTicketRef] = useState('');
+export default function UserPortal({ onAdminClick }) {
+  const [userInfo,   setUserInfo]   = useState(null); // { firstName, lastName, department }
+  const [screen,     setScreen]     = useState('form');
+  const [wizCat,     setWizCat]     = useState(null);
+  const [wizText,    setWizText]    = useState('');
+  const [ticketRef,  setTicketRef]  = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Guest ticket creation — uses a fixed guest user_id from backend
   async function handleCreateTicket(text, category, via = 'direct') {
     setSubmitting(true);
     try {
-      const data = await ticketsApi.create({
-        title:    text || `${category} issue`,
+      const data = await ticketsApi.createGuest({
+        title:       text || `${category} issue`,
         description: text,
-        category: category.charAt(0).toUpperCase() + category.slice(1),
-        priority: 'med',
+        category:    category.charAt(0).toUpperCase() + category.slice(1),
+        priority:    'med',
         via,
+        requester_name:       `${userInfo.firstName} ${userInfo.lastName}`,
+        requester_department: userInfo.department,
       });
       setTicketRef(data.ticket.ref);
       setScreen('success');
@@ -370,37 +388,28 @@ export default function UserPortal() {
     }
   }
 
-  function handleStartWizard(cat, text) {
-    setWizCat(cat);
-    setWizText(text);
-    setScreen('wizard');
+  function handleStartWizard(cat, text) { setWizCat(cat); setWizText(text); setScreen('wizard'); }
+  function handleReset() { setScreen('form'); setWizCat(null); setWizText(''); setTicketRef(''); }
+
+  // Show registration form if user not identified yet
+  if (!userInfo) {
+    return <UserRegForm onEnter={setUserInfo} />;
   }
 
-  function handleReset() {
-    setScreen('form');
-    setWizCat(null);
-    setWizText('');
-    setTicketRef('');
-  }
+  const userName = `${userInfo.firstName} ${userInfo.lastName}`;
 
   return (
     <div className="app-shell">
-      <TopNav view={navView} onSwitch={v => { setNavView(v); if (v === 'portal') handleReset(); }} />
+      <TopNav onAdminClick={onAdminClick} userName={userName} />
       {submitting && (
         <div style={{ position: 'fixed', top: 60, left: 0, right: 0, background: '#185FA5', color: 'white', textAlign: 'center', padding: 10, fontSize: 13, zIndex: 999 }}>
           ⏳ ტიკეტი იქმნება...
         </div>
       )}
-      {navView === 'status' ? (
-        <StatusView />
-      ) : (
-        <>
-          {screen === 'form'     && <PortalForm onStartWizard={handleStartWizard} onDirectTicket={(cat, text) => handleCreateTicket(text, cat, 'direct')} />}
-          {screen === 'wizard'   && <WizardView category={wizCat} problemText={wizText} onBack={handleReset} onCreateTicket={handleCreateTicket} onResolved={() => setScreen('resolved')} />}
-          {screen === 'success'  && <SuccessView ticketRef={ticketRef} onReset={handleReset} />}
-          {screen === 'resolved' && <ResolvedView onReset={handleReset} />}
-        </>
-      )}
+      {screen === 'form'     && <PortalForm onStartWizard={handleStartWizard} onDirectTicket={(cat, text) => handleCreateTicket(text, cat, 'direct')} />}
+      {screen === 'wizard'   && <WizardView category={wizCat} problemText={wizText} onBack={handleReset} onCreateTicket={handleCreateTicket} onResolved={() => setScreen('resolved')} />}
+      {screen === 'success'  && <SuccessView ticketRef={ticketRef} onReset={handleReset} />}
+      {screen === 'resolved' && <ResolvedView onReset={handleReset} />}
     </div>
   );
 }
