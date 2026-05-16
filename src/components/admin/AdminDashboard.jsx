@@ -443,7 +443,8 @@ export default function AdminDashboard({ onBack }) {
   const [catFilter,    setCatFilter]    = useState('');
   const [prioFilter,   setPrioFilter]   = useState('');
   const [showCreate,   setShowCreate]   = useState(false);
-    const [showReports, setShowReports] = useState(false);
+  const [showReports, setShowReports] = useState(false);
+  const { user, logout } = useAuth();
 
   async function loadData() {
   try {
