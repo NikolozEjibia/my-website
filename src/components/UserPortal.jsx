@@ -138,8 +138,19 @@ function UserRegForm({ onEnter }) {
           </button>
         </form>
 
-        <div style={{ marginTop: 16, textAlign: 'right' }}>
+        <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <LangToggle />
+          <button
+            type="button"
+            onClick={() => window.__showAdminLogin?.() || document.dispatchEvent(new CustomEvent('showAdminLogin'))}
+            style={{
+              background: 'none', border: '1px solid #D3D1C7',
+              borderRadius: 8, padding: '5px 12px',
+              fontSize: 12, color: '#888780', cursor: 'pointer',
+            }}
+          >
+            🔐 Admin / Support
+          </button>
         </div>
       </div>
     </div>
