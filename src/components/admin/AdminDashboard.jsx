@@ -497,6 +497,30 @@ export default function AdminDashboard({ onBack }) {
           onCreated={newAgent => setAgents(a => [...a, newAgent])}
         />
       )}
+{/* Mobile bottom nav */}
+      <nav className="mobile-nav">
+        <div className="mobile-nav-items">
+          {[
+            { id: 'all',      icon: '🎫', label: 'ყველა' },
+            { id: 'open',     icon: '📬', label: 'ღია' },
+            { id: 'progress', icon: '⚡', label: 'პროცესი' },
+            { id: 'closed',   icon: '✅', label: 'დახ.' },
+          ].map(item => (
+            <button key={item.id} className={`mobile-nav-btn${activeNav === item.id ? ' active' : ''}`} onClick={() => setActiveNav(item.id)}>
+              <span className="mnb-icon">{item.icon}</span>
+              <span className="mnb-label">{item.label}</span>
+            </button>
+          ))}
+          <button className="mobile-nav-btn" onClick={() => setShowCreate(true)}>
+            <span className="mnb-icon">➕</span>
+            <span className="mnb-label">Support</span>
+          </button>
+          <button className="mobile-nav-btn" onClick={() => { logout(); onBack(); }}>
+            <span className="mnb-icon">🚪</span>
+            <span className="mnb-label">გასვლა</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }
